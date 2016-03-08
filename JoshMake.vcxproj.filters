@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="JobSystem.cpp" />
+    <ClCompile Include="Interface\Compiler.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Interface\CxxFile.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Interface\Project.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="JobSystem.h" />
+    <ClInclude Include="Interface\Compiler.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Interface\CxxFile.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Interface\Project.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Interface">
+      <UniqueIdentifier>{ab6056e3-111a-47ba-8321-fb8686d19431}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
