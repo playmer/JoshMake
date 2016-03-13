@@ -118,6 +118,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Builder.cpp" />
     <ClCompile Include="Interface\Compiler.cpp" />
     <ClCompile Include="Interface\CxxFile.cpp" />
     <ClCompile Include="JobSystem.cpp" />
@@ -125,10 +126,12 @@
     <ClCompile Include="Interface\Project.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Builder.h" />
     <ClInclude Include="Interface\Compiler.h" />
     <ClInclude Include="Interface\CxxFile.h" />
     <ClInclude Include="JobSystem.h" />
     <ClInclude Include="Interface\Project.h" />
+    <ClInclude Include="Types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
