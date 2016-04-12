@@ -17,9 +17,20 @@ namespace JoshMake
     {
         public void PathHint(string aHint) { mPathHint = aHint; }
 
-        protected List<string> mPathsToLibraries = new List<string>();
-        protected List<string> mPathsToIncludes = new List<string>();
+        public List<string> mPathsToLibraries = new List<string>();
+        public List<string> mPathsToIncludes = new List<string>();
         protected string mPathHint = "";
+    }
+
+    public class Zilch : Dependency
+    {
+        public Zilch(string aHint)
+        {
+            mPathHint = aHint;
+
+            mPathsToIncludes.Add(Path.Combine(new string[] { aHint, "Zilch", "inc" }));
+            mPathsToLibraries.Add(Path.Combine(new string[] { aHint, "Zilch", "lib", "Zilch.lib" }));
+        }
     }
 
     public class Boost : Dependency
@@ -46,6 +57,11 @@ namespace JoshMake
 
     public abstract class Compiler
     {
+        public void AddDependency(Dependency aDependency)
+        {
+            mDependencies.Add(aDependency);
+        }
+
         public void AddLinkerFlag(int aFlag)
         {
             mLinkerFlags.Add(aFlag);
@@ -60,6 +76,7 @@ namespace JoshMake
 
         public abstract string Link(string aOutName, string[]aFiles);
 
+        protected List<Dependency> mDependencies = new List<Dependency>();
         protected List<int> mLinkerFlags = new List<int>();
         protected List<int> mCompilerFlags = new List<int>();
         protected List<string> mLinkerIncludeDirectories = new List<string>()
@@ -95,18 +112,35 @@ namespace JoshMake
             mCompilerFlags.Add((int)aFlag);
         }
 
-        public enum LinkerFlag
-        {
-            LinkTimeCodeGeneration
-        }
         public enum CompilerFlag
         {
+            // WARNINGS
             Warnings1,
             Warnings2,
             Warnings3,
             Warnings4,
             AllWarnings,
-            WarningsAsErrors
+            WarningsAsErrors,
+            // OPTIMIZATION
+            DisableOptimization,
+            Optimization1,
+            Optimization2,
+            OptimizationB,
+            MaxOptimization,
+            // CODE GENERATION
+            EnableRunTimeErrorChecking,
+            // LANGUAGE OPTIONS
+            GenerateCompleteDebuggingInfo
+        }
+
+
+        public enum LinkerFlag
+        {
+            LinkTimeCodeGeneration,
+            MultiThreadedDLL,
+            MultiThreadedDLLWithDebug,
+            MultiThreadedExe,
+            MultiThreadedExeWithDebug
         }
 
         string CompilerFlags()
@@ -124,6 +158,13 @@ namespace JoshMake
                     case CompilerFlag.Warnings4: compilerFlags.Append(" /W4 "); break;
                     case CompilerFlag.AllWarnings: compilerFlags.Append(" /Wall "); break;
                     case CompilerFlag.WarningsAsErrors: compilerFlags.Append(" /Werror "); break;
+                    case CompilerFlag.DisableOptimization: compilerFlags.Append( " /Od "); break;
+                    case CompilerFlag.Optimization1: compilerFlags.Append( " /O1 "); break;
+                    case CompilerFlag.Optimization2: compilerFlags.Append( " /O2 "); break;
+                    case CompilerFlag.OptimizationB: compilerFlags.Append( " /Ob "); break;
+                    case CompilerFlag.MaxOptimization: compilerFlags.Append( " /Ox "); break;
+                    case CompilerFlag.EnableRunTimeErrorChecking: compilerFlags.Append( " /RTC "); break;
+                    case CompilerFlag.GenerateCompleteDebuggingInfo: compilerFlags.Append(" /Zi ");  break;
                 }
             }
 
@@ -141,9 +182,40 @@ namespace JoshMake
                 builder.Append(" ");
             }
 
+            foreach (var dependency in mDependencies)
+            {
+                foreach (var path in dependency.mPathsToIncludes)
+                {
+                    builder.Append(" /I");
+                    builder.Append(path.Replace('\\', '/'));
+                    builder.Append(" ");
+                }
+            }
+
             return builder.ToString();
         }
 
+
+
+        string LinkerFlags()
+        {
+            StringBuilder linkerFlags = new StringBuilder();
+            linkerFlags.Append(" /NOLOGO ");
+
+            foreach (LinkerFlag flag in mLinkerFlags)
+            {
+                switch (flag)
+                {
+                    case LinkerFlag.LinkTimeCodeGeneration: linkerFlags.Append(" /LTCG "); break;
+                    case LinkerFlag.MultiThreadedDLL : linkerFlags.Append(" /MD "); break;
+                    case LinkerFlag.MultiThreadedDLLWithDebug : linkerFlags.Append(" /MDd "); break;
+                    case LinkerFlag.MultiThreadedExe : linkerFlags.Append(" /MT "); break; 
+                    case LinkerFlag.MultiThreadedExeWithDebug: linkerFlags.Append(" /MTd "); break;
+                }
+            }
+
+            return linkerFlags.ToString();
+        }
 
         string LinkerIncludePaths()
         {
@@ -157,22 +229,6 @@ namespace JoshMake
             }
 
             return builder.ToString();
-        }
-
-        string LinkerFlags()
-        {
-            StringBuilder linkerFlags = new StringBuilder();
-            linkerFlags.Append(" /NOLOGO ");
-
-            foreach (LinkerFlag flag in mLinkerFlags)
-            {
-                switch (flag)
-                {
-                    case LinkerFlag.LinkTimeCodeGeneration: linkerFlags.Append(" /LTCG "); break;
-                }
-            }
-
-            return linkerFlags.ToString();
         }
 
         public override string Compile(string aOutName, string[] aFiles)
@@ -199,6 +255,8 @@ namespace JoshMake
 
             info.UseShellExecute = false;
             info.Arguments = compileCommandBuilder.ToString();
+
+            Console.WriteLine(info.Arguments);
 
             var compiling = Process.Start(info);
 
@@ -235,6 +293,15 @@ namespace JoshMake
                 linkCommandBuilder.Append(' ');
             }
 
+            foreach (var dependency in mDependencies)
+            {
+                foreach (var path in dependency.mPathsToLibraries)
+                {
+                    linkCommandBuilder.Append(" ");
+                    linkCommandBuilder.Append(path.Replace('\\', '/'));
+                    linkCommandBuilder.Append(" ");
+                }
+            }
 
             linkCommandBuilder.Append(LinkerIncludePaths());
 
@@ -249,6 +316,7 @@ namespace JoshMake
 
             info.UseShellExecute = false;
             info.Arguments = linkCommandBuilder.ToString();
+            Console.WriteLine(info.Arguments);
 
             var linking = Process.Start(info);
 
@@ -291,6 +359,11 @@ namespace JoshMake
         public void AddDependencyPathHint(string aHint) { mPathHints.Add(aHint); }
 
 
+        public void AddFile(string aFile)
+        {
+            mFiles.Add(aFile);
+        }
+
         public void AddFolder(string aFolder, string[] aExtensions = null)
         {
             aExtensions = aExtensions ?? new string[] { "*.cpp", "*.c" };
@@ -310,6 +383,11 @@ namespace JoshMake
         {
             foreach (var compiler in mCompilers)
             {
+                foreach (var dependency in mDependencies)
+                {
+                    compiler.AddDependency(dependency);
+                }
+
                 var mFilesToLink = new List<string>();
 
                 foreach (var file in mFiles)
@@ -333,43 +411,60 @@ namespace JoshMake
     {
         static void Main(string[] args) 
         {
-            string source = File.ReadAllText("JoshMake.cs");
-
-            Dictionary<string, string> providerOptions = new Dictionary<string, string>
-                {
-                    {"CompilerVersion", "v4.0"}
-                };
-            CSharpCodeProvider provider = new CSharpCodeProvider(providerOptions);
-
-            CompilerParameters compilerParams = new CompilerParameters
+            try
             {
-                GenerateInMemory = true,
-                GenerateExecutable = false
-            };
-
-            var assemblies = AppDomain.CurrentDomain
-                            .GetAssemblies()
-                            .Where(a => !a.IsDynamic)
-                            .Select(a => a.Location);
-
-            compilerParams.ReferencedAssemblies.AddRange(assemblies.ToArray());
-
-
-            CompilerResults results = provider.CompileAssemblyFromSource(compilerParams, source);
-
-            if (results.Errors.Count != 0)
-            {
-                Console.WriteLine("Failed to compile JoshMake script. Errors will follow:");
-
-                foreach (var error in results.Errors)
+                if (File.Exists("JoshMake.cs") == false)
                 {
-                    Console.WriteLine(error.ToString());
+                    Console.WriteLine("No JoshMake.cs found, are you invoking from the correct directory?");
+                    return;
                 }
+            
+                string source = File.ReadAllText("JoshMake.cs");
+            
+                Dictionary<string, string> providerOptions = new Dictionary<string, string>
+                    {
+                        {"CompilerVersion", "v4.0"}
+                    };
+                CSharpCodeProvider provider = new CSharpCodeProvider(providerOptions);
+            
+                CompilerParameters compilerParams = new CompilerParameters
+                {
+                    GenerateInMemory = true,
+                    GenerateExecutable = false
+                };
+            
+                var assemblies = AppDomain.CurrentDomain
+                                .GetAssemblies()
+                                .Where(a => !a.IsDynamic)
+                                .Select(a => a.Location);
+            
+                compilerParams.ReferencedAssemblies.AddRange(assemblies.ToArray());
+            
+            
+                CompilerResults results = provider.CompileAssemblyFromSource(compilerParams, source);
+            
+                if (results.Errors.Count != 0)
+                {
+                    Console.WriteLine("Failed to compile JoshMake script. Errors will follow:");
+            
+                    foreach (var error in results.Errors)
+                    {
+                        Console.WriteLine(error.ToString());
+                    }
+            
+                    return;
+                }
+            
+                object o = results.CompiledAssembly.CreateInstance("BuildSystem.Program");
+                MethodInfo mi = o.GetType().GetMethod("Configuration");
+                mi.Invoke(o, null);
             }
-
-            object o = results.CompiledAssembly.CreateInstance("BuildSystem.Program");
-            MethodInfo mi = o.GetType().GetMethod("Configuration");
-            mi.Invoke(o, null);
+            catch (Exception e)
+            {
+                // Something unexpected went wrong.
+                Console.WriteLine(e.ToString());
+                // Maybe it is also necessary to terminate / restart the application.
+            }
         }
     }
 }

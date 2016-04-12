@@ -8,12 +8,6 @@ namespace BuildSystem
         {
             Project helloWorld = new Project("HelloWorld");
 
-            // We can get all of boost
-            //helloWorld.AddDependency(new Boost());
-
-            // Or just some of it.
-            //helloWorld.AddDependency(new Boost.Asio());
-
             // Make and add msvc while turning on some flags.
             var msvc = new msvc();
             msvc.AddCompilerFlag(msvc.CompilerFlag.Warnings1);
