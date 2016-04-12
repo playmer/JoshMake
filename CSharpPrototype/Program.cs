@@ -5,10 +5,15 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Net;
+using Microsoft.CSharp;
+using System.CodeDom.Compiler;
 
-namespace ConsoleApplication1
+
+namespace JoshMake
 {
-    class Dependency
+    public class Dependency
     {
         public void PathHint(string aHint) { mPathHint = aHint; }
 
@@ -16,29 +21,26 @@ namespace ConsoleApplication1
         protected List<string> mPathsToIncludes = new List<string>();
         protected string mPathHint = "";
     }
-    
-    namespace Dependencies
+
+    public class Boost : Dependency
+    { 
+        public class Asio : Dependency
+        {
+        }
+
+    }
+
+    public class Dropbox : Dependency
     {
-        class Boost : Dependency
-        { 
-            public class Asio : Dependency
-            {
-            }
-
-        }
-
-        class Dropbox : Dependency
+        public class Json11 : Dependency
         {
-            public class Json11 : Dependency
-            {
-            }
         }
+    }
 
-        class Facebook : Dependency
+    public class Facebook : Dependency
+    {
+        public class Folly : Dependency
         {
-            public class Folly : Dependency
-            {
-            }
         }
     }
 
@@ -81,204 +83,199 @@ namespace ConsoleApplication1
         protected string mPathHint = "";
     }
 
-    namespace Compilers
+    public class msvc : Compiler
     {
-        //class gcc : Compiler
-        //{
-        //}
-        //
-        //class clang : Compiler
-        //{
-        //}
-
-        class msvc : Compiler
+        public void AddLinkerFlag(LinkerFlag aFlag)
         {
-            public void AddLinkerFlag(LinkerFlag aFlag)
-            {
-                mLinkerFlags.Add((int)aFlag);
-            }
+            mLinkerFlags.Add((int)aFlag);
+        }
 
-            public void AddCompilerFlag(CompilerFlag aFlag)
-            {
-                mCompilerFlags.Add((int)aFlag);
-            }
+        public void AddCompilerFlag(CompilerFlag aFlag)
+        {
+            mCompilerFlags.Add((int)aFlag);
+        }
 
-            public enum LinkerFlag
-            {
-                LinkTimeCodeGeneration
-            }
-            public enum CompilerFlag
-            {
-                Warnings1,
-                Warnings2,
-                Warnings3,
-                Warnings4,
-                AllWarnings,
-                WarningsAsErrors
-            }
+        public enum LinkerFlag
+        {
+            LinkTimeCodeGeneration
+        }
+        public enum CompilerFlag
+        {
+            Warnings1,
+            Warnings2,
+            Warnings3,
+            Warnings4,
+            AllWarnings,
+            WarningsAsErrors
+        }
 
-            string CompilerFlags()
-            {
-                StringBuilder compilerFlags = new StringBuilder();
-                compilerFlags.Append(" /nologo /EHsc ");
+        string CompilerFlags()
+        {
+            StringBuilder compilerFlags = new StringBuilder();
+            compilerFlags.Append(" /nologo /EHsc ");
 
-                foreach(CompilerFlag flag in mCompilerFlags)
+            foreach(CompilerFlag flag in mCompilerFlags)
+            {
+                switch (flag)
                 {
-                    switch (flag)
-                    {
-                        case CompilerFlag.Warnings1: compilerFlags.Append(" /W1 "); break;
-                        case CompilerFlag.Warnings2: compilerFlags.Append(" /W2 "); break;
-                        case CompilerFlag.Warnings3: compilerFlags.Append(" /W3 "); break;
-                        case CompilerFlag.Warnings4: compilerFlags.Append(" /W4 "); break;
-                        case CompilerFlag.AllWarnings: compilerFlags.Append(" /Wall "); break;
-                        case CompilerFlag.WarningsAsErrors: compilerFlags.Append(" /Werror "); break;
-                    }
+                    case CompilerFlag.Warnings1: compilerFlags.Append(" /W1 "); break;
+                    case CompilerFlag.Warnings2: compilerFlags.Append(" /W2 "); break;
+                    case CompilerFlag.Warnings3: compilerFlags.Append(" /W3 "); break;
+                    case CompilerFlag.Warnings4: compilerFlags.Append(" /W4 "); break;
+                    case CompilerFlag.AllWarnings: compilerFlags.Append(" /Wall "); break;
+                    case CompilerFlag.WarningsAsErrors: compilerFlags.Append(" /Werror "); break;
                 }
-
-                return compilerFlags.ToString();
             }
 
-            string CompilerIncludePaths()
+            return compilerFlags.ToString();
+        }
+
+        string CompilerIncludePaths()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            foreach (var path in mCompilerIncludeDirectories)
             {
-                StringBuilder builder = new StringBuilder();
-
-                foreach (var path in mCompilerIncludeDirectories)
-                {
-                    builder.Append(" /I");
-                    builder.Append(path);
-                    builder.Append(" ");
-                }
-
-                return builder.ToString();
+                builder.Append(" /I");
+                builder.Append(path);
+                builder.Append(" ");
             }
 
+            return builder.ToString();
+        }
 
-            string LinkerIncludePaths()
+
+        string LinkerIncludePaths()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            foreach (var path in mLinkerIncludeDirectories)
             {
-                StringBuilder builder = new StringBuilder();
-
-                foreach (var path in mLinkerIncludeDirectories)
-                {
-                    builder.Append(" /LIBPATH:");
-                    builder.Append(path);
-                    builder.Append(" ");
-                }
-
-                return builder.ToString();
+                builder.Append(" /LIBPATH:");
+                builder.Append(path);
+                builder.Append(" ");
             }
 
-            string LinkerFlags()
+            return builder.ToString();
+        }
+
+        string LinkerFlags()
+        {
+            StringBuilder linkerFlags = new StringBuilder();
+            linkerFlags.Append(" /NOLOGO ");
+
+            foreach (LinkerFlag flag in mLinkerFlags)
             {
-                StringBuilder linkerFlags = new StringBuilder();
-                linkerFlags.Append(" /NOLOGO ");
-
-                foreach (LinkerFlag flag in mLinkerFlags)
+                switch (flag)
                 {
-                    switch (flag)
-                    {
-                        case LinkerFlag.LinkTimeCodeGeneration: linkerFlags.Append(" /LTCG "); break;
-                    }
+                    case LinkerFlag.LinkTimeCodeGeneration: linkerFlags.Append(" /LTCG "); break;
                 }
-
-                return linkerFlags.ToString();
             }
 
-            public override string Compile(string aOutName, string[] aFiles)
+            return linkerFlags.ToString();
+        }
+
+        public override string Compile(string aOutName, string[] aFiles)
+        {
+            StringBuilder compileCommandBuilder = new StringBuilder();
+            compileCommandBuilder.Append("/c ");
+            compileCommandBuilder.Append(CompilerFlags());
+
+            foreach (string file in aFiles)
             {
-                StringBuilder compileCommandBuilder = new StringBuilder();
-                compileCommandBuilder.Append("/c ");
-                compileCommandBuilder.Append(CompilerFlags());
+                compileCommandBuilder.Append(file.Replace('\\', '/'));
+                compileCommandBuilder.Append(' ');
+            }
 
-                foreach (string file in aFiles)
-                {
-                    compileCommandBuilder.Append(file.Replace('\\', '/'));
-                    compileCommandBuilder.Append(' ');
-                }
+            compileCommandBuilder.Append(CompilerIncludePaths());
 
-                compileCommandBuilder.Append(CompilerIncludePaths());
+            compileCommandBuilder.Append(" /Fo");
+            compileCommandBuilder.Append(aOutName);
 
-                compileCommandBuilder.Append(" /Fo");
-                compileCommandBuilder.Append(aOutName);
+            ProcessStartInfo info = new ProcessStartInfo("\"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/cl.exe\"");
+            info.RedirectStandardOutput = true;
+            info.RedirectStandardError = true;
+            info.CreateNoWindow = false;
 
-                ProcessStartInfo info = new ProcessStartInfo("\"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/cl.exe\"");
-                info.RedirectStandardOutput = true;
-                info.RedirectStandardError = true;
-                info.CreateNoWindow = false;
+            info.UseShellExecute = false;
+            info.Arguments = compileCommandBuilder.ToString();
 
-                info.UseShellExecute = false;
-                info.Arguments = compileCommandBuilder.ToString();
+            var compiling = Process.Start(info);
 
-                var compiling = Process.Start(info);
+            string output = compiling.StandardOutput.ReadToEnd();
+            string errors = compiling.StandardError.ReadToEnd();
+            compiling.WaitForExit();
+            
+            Console.WriteLine(output);
 
-                string output = compiling.StandardOutput.ReadToEnd();
-                string errors = compiling.StandardError.ReadToEnd();
-                compiling.WaitForExit();
-
-                Console.WriteLine("Output Reported by CL for Files {0}:", aFiles);
-                Console.WriteLine(output);
+            if (errors.Count() != 0)
+            {
                 Console.WriteLine("Errors Reported by CL for Files {0}:", aFiles);
                 Console.WriteLine(errors);
-
-                if (compiling.ExitCode == 0)
-                {
-                    return aOutName;
-                }
-                else
-                {
-                    return "";
-                }
             }
 
-            public override string Link(string aOutName, string[] aFiles)
+            if (compiling.ExitCode == 0)
             {
-                StringBuilder linkCommandBuilder = new StringBuilder();
-                linkCommandBuilder.Append(LinkerFlags());
+                return aOutName;
+            }
+            else
+            {
+                return "";
+            }
+        }
 
-                foreach (string file in aFiles)
-                {
-                    linkCommandBuilder.Append(file.Replace('\\', '/'));
-                    linkCommandBuilder.Append(' ');
-                }
+        public override string Link(string aOutName, string[] aFiles)
+        {
+            StringBuilder linkCommandBuilder = new StringBuilder();
+            linkCommandBuilder.Append(LinkerFlags());
+
+            foreach (string file in aFiles)
+            {
+                linkCommandBuilder.Append(file.Replace('\\', '/'));
+                linkCommandBuilder.Append(' ');
+            }
 
 
-                linkCommandBuilder.Append(LinkerIncludePaths());
+            linkCommandBuilder.Append(LinkerIncludePaths());
 
-                linkCommandBuilder.Append(" /OUT:");
-                linkCommandBuilder.Append(aOutName);
+            linkCommandBuilder.Append(" /OUT:");
+            linkCommandBuilder.Append(aOutName);
 
 
-                ProcessStartInfo info = new ProcessStartInfo("\"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/link.exe\"");
-                info.RedirectStandardOutput = true;
-                info.RedirectStandardError = true;
-                info.CreateNoWindow = false;
+            ProcessStartInfo info = new ProcessStartInfo("\"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/link.exe\"");
+            info.RedirectStandardOutput = true;
+            info.RedirectStandardError = true;
+            info.CreateNoWindow = false;
 
-                info.UseShellExecute = false;
-                info.Arguments = linkCommandBuilder.ToString();
+            info.UseShellExecute = false;
+            info.Arguments = linkCommandBuilder.ToString();
 
-                var linking = Process.Start(info);
+            var linking = Process.Start(info);
 
-                string output = linking.StandardOutput.ReadToEnd();
-                string errors = linking.StandardError.ReadToEnd();
-                linking.WaitForExit();
+            string output = linking.StandardOutput.ReadToEnd();
+            string errors = linking.StandardError.ReadToEnd();
+            linking.WaitForExit();
+            
+            Console.WriteLine(output);
 
-                Console.WriteLine("Output Reported by LINK for Files {0}:", aFiles);
-                Console.WriteLine(output);
+            if (errors.Count() != 0)
+            {
                 Console.WriteLine("Errors Reported by LINK for Files {0}:", aFiles);
                 Console.WriteLine(errors);
+            }
 
-                if (linking.ExitCode == 0)
-                {
-                    return aOutName;
-                }
-                else
-                {
-                    return "";
-                }
+            if (linking.ExitCode == 0)
+            {
+                return aOutName;
+            }
+            else
+            {
+                return "";
             }
         }
     }
 
-    class Project
+    public class Project
     {
         public Project(string aProjectName) { mProjectName = aProjectName; }
         public void AddDependency(Dependency aDependency)
@@ -332,37 +329,47 @@ namespace ConsoleApplication1
         List<Compiler> mCompilers = new List<Compiler>();
     }
 
-
-
-
-    
     class Program
     {
-        static public void UserScript()
-        {
-            Project helloWorld = new Project("HelloWorld");
-
-            // We can get all of boost
-            //helloWorld.AddDependency(new Dependencies.Boost());
-
-            // Or just some of it.
-            //helloWorld.AddDependency(new Dependencies.Boost.Asio());
-
-            // Make and add msvc while turning on some flags.
-            var msvc = new Compilers.msvc();
-            msvc.AddCompilerFlag(Compilers.msvc.CompilerFlag.Warnings1);
-            msvc.AddLinkerFlag(Compilers.msvc.LinkerFlag.LinkTimeCodeGeneration);
-
-            helloWorld.AddCompiler(msvc);
-
-            helloWorld.AddFolder("TestFiles");
-
-            helloWorld.Compile();
-        }
-
         static void Main(string[] args) 
         {
-            UserScript();
+            string source = File.ReadAllText("JoshMake.cs");
+
+            Dictionary<string, string> providerOptions = new Dictionary<string, string>
+                {
+                    {"CompilerVersion", "v4.0"}
+                };
+            CSharpCodeProvider provider = new CSharpCodeProvider(providerOptions);
+
+            CompilerParameters compilerParams = new CompilerParameters
+            {
+                GenerateInMemory = true,
+                GenerateExecutable = false
+            };
+
+            var assemblies = AppDomain.CurrentDomain
+                            .GetAssemblies()
+                            .Where(a => !a.IsDynamic)
+                            .Select(a => a.Location);
+
+            compilerParams.ReferencedAssemblies.AddRange(assemblies.ToArray());
+
+
+            CompilerResults results = provider.CompileAssemblyFromSource(compilerParams, source);
+
+            if (results.Errors.Count != 0)
+            {
+                Console.WriteLine("Failed to compile JoshMake script. Errors will follow:");
+
+                foreach (var error in results.Errors)
+                {
+                    Console.WriteLine(error.ToString());
+                }
+            }
+
+            object o = results.CompiledAssembly.CreateInstance("BuildSystem.Program");
+            MethodInfo mi = o.GetType().GetMethod("Configuration");
+            mi.Invoke(o, null);
         }
     }
 }
