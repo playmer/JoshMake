@@ -455,7 +455,7 @@ namespace JoshMake
                     return;
                 }
             
-                object o = results.CompiledAssembly.CreateInstance("BuildSystem.Program");
+                object o = results.CompiledAssembly.CreateInstance("Program");
                 MethodInfo mi = o.GetType().GetMethod("Configuration");
                 mi.Invoke(o, null);
             }
